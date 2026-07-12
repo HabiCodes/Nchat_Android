@@ -1,4 +1,4 @@
-package com.jarvis.nchat.ui.theme
+package com.jarvis.nchat.routes.designsystem
 
 import androidx.compose.ui.graphics.Color
 
