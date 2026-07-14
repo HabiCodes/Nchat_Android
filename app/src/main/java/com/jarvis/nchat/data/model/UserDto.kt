@@ -18,3 +18,4 @@ data class AuthResponse(
 data class RegisterRequest(val username: String, val email: String, val password: String)
 data class LoginRequest(val email: String, val password: String)
 data class UserSearchResponse(val users: List<UserDto>)
+data class ChangePasswordRequest(val currentPassword: String, val newPassword: String)

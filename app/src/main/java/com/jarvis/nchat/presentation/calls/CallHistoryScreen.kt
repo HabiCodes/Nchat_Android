@@ -1,39 +1,21 @@
 package com.jarvis.nchat.presentation.calls
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CallMade
-import androidx.compose.material.icons.filled.CallMissed
-import androidx.compose.material.icons.filled.CallReceived
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.ExperimentalMaterial3Api
-
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.jarvis.nchat.core.designsystem.ChatAppTheme
-import com.jarvis.nchat.routes.designsystem.MissedCallRed
-import com.jarvis.nchat.routes.designsystem.OutgoingCallGreen
+import com.jarvis.nchat.core.designsystem.MissedCallRed
+import com.jarvis.nchat.core.designsystem.OutgoingCallGreen
 import com.jarvis.nchat.core.designsystem.Spacing
 import com.jarvis.nchat.presentation.components.AvatarImage
 
@@ -44,58 +26,45 @@ data class CallLogEntry(
     val id: String,
     val name: String,
     val avatarUrl: String?,
+    val otherUserId: String,
     val direction: CallDirection,
     val kind: CallKind,
     val time: String,
 )
 
-private val mockCalls = listOf(
-    CallLogEntry("c1", "Naveen (Partner)", null, CallDirection.OUTGOING, CallKind.VIDEO, "Today, 10:22 AM"),
-    CallLogEntry("c2", "Bob", null, CallDirection.MISSED, CallKind.AUDIO, "Today, 9:15 AM"),
-    CallLogEntry("c3", "RD Solar Team", null, CallDirection.INCOMING, CallKind.AUDIO, "Yesterday, 6:40 PM"),
-    CallLogEntry("c4", "Mom", null, CallDirection.OUTGOING, CallKind.VIDEO, "Yesterday, 8:05 PM"),
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CallHistoryScreen(
-    onCallEntryClick: (String) -> Unit,
-    onAudioCallClick: (String) -> Unit,
-    onVideoCallClick: (String) -> Unit,
+    onAudioCallClick: (String, String) -> Unit,
+    viewModel: CallHistoryViewModel = hiltViewModel(),
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("Calls", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) })
-        }
+        topBar = { TopAppBar(title = { Text("Calls", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }) }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(vertical = Spacing.sm)
-        ) {
-            items(mockCalls, key = { it.id }) { call ->
-                CallRow(
-                    call = call,
-                    onClick = { onCallEntryClick(call.id) },
-                    onAudioClick = { onAudioCallClick(call.id) },
-                    onVideoClick = { onVideoCallClick(call.id) }
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            when {
+                uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                uiState.calls.isEmpty() -> Text(
+                    "No calls yet",
+                    modifier = Modifier.align(Alignment.Center),
+                    color = ChatAppTheme.extendedColors.textSecondary
                 )
+                else -> LazyColumn(contentPadding = PaddingValues(vertical = Spacing.sm)) {
+                    items(uiState.calls, key = { it.id }) { call ->
+                        CallRow(call = call, onCallClick = { onAudioCallClick(call.otherUserId, call.name) })
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CallRow(
-    call: CallLogEntry,
-    onClick: () -> Unit,
-    onAudioClick: () -> Unit,
-    onVideoClick: () -> Unit,
-) {
+private fun CallRow(call: CallLogEntry, onCallClick: () -> Unit) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onCallClick).padding(horizontal = Spacing.lg, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AvatarImage(name = call.name, avatarUrl = call.avatarUrl, size = 48)
@@ -113,20 +82,14 @@ private fun CallRow(
                     CallDirection.OUTGOING -> Icons.Filled.CallMade
                     CallDirection.MISSED -> Icons.Filled.CallMissed
                 }
-                val directionColor = when (call.direction) {
-                    CallDirection.MISSED -> MissedCallRed
-                    else -> OutgoingCallGreen
-                }
+                val directionColor = if (call.direction == CallDirection.MISSED) MissedCallRed else OutgoingCallGreen
                 Icon(directionIcon, contentDescription = null, tint = directionColor, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(Spacing.xs))
-                Text(call.time, style = MaterialTheme.typography.bodySmall, color = ChatAppTheme.extendedColors.textSecondary)
+                Text(call.time.take(16).replace("T", " "), style = MaterialTheme.typography.bodySmall, color = ChatAppTheme.extendedColors.textSecondary)
             }
         }
-        IconButton(onClick = onVideoClick) {
-            Icon(Icons.Filled.Videocam, contentDescription = "Video call", tint = MaterialTheme.colorScheme.primary)
-        }
-        IconButton(onClick = onAudioClick) {
-            Icon(Icons.Filled.Call, contentDescription = "Audio call", tint = MaterialTheme.colorScheme.primary)
+        IconButton(onClick = onCallClick) {
+            Icon(Icons.Filled.Call, contentDescription = "Call", tint = MaterialTheme.colorScheme.primary)
         }
     }
 }

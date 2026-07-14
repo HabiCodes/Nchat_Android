@@ -1,28 +1,42 @@
 package com.jarvis.nchat.core.navigation
 
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.jarvis.nchat.presentation.auth.LoginScreen
 import com.jarvis.nchat.presentation.auth.RegisterScreen
+import com.jarvis.nchat.presentation.calls.ActiveCallScreen
 import com.jarvis.nchat.presentation.calls.CallHistoryScreen
+import com.jarvis.nchat.presentation.calls.CallStatus
+import com.jarvis.nchat.presentation.calls.CallViewModel
+import com.jarvis.nchat.presentation.calls.IncomingCallScreen
 import com.jarvis.nchat.presentation.chats.ChatDetailScreen
 import com.jarvis.nchat.presentation.chats.ChatListScreen
 import com.jarvis.nchat.presentation.profile.ProfileScreen
 import com.jarvis.nchat.presentation.search.SearchScreen
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.currentBackStackEntryAsState
+
 @Composable
 fun ChatAppRoot(startDestination: String) {
     val navController = rememberNavController()
-
-    // Only show bottom nav on the 4 main tabs, not on auth/chat-detail screens
     val backStackEntry by navController.currentBackStackEntryAsState()
+
+    val activity = LocalContext.current as ComponentActivity
+    val callViewModel: CallViewModel = hiltViewModel(activity)
+    val callState by callViewModel.uiState.collectAsState()
+
+    LaunchedEffect(callState.status) {
+        if (callState.status == CallStatus.RINGING_INCOMING) {
+            navController.navigate(Screen.IncomingCall.route)
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -50,31 +64,61 @@ fun ChatAppRoot(startDestination: String) {
             }
             composable(Screen.Chats.route) {
                 ChatListScreen(
-                    onChatClick = { conversationId -> navController.navigate(Screen.ChatDetail.createRoute(conversationId)) },
+                    onChatClick = { conversationId, otherUserId, username, isOnline ->
+                        navController.navigate(Screen.ChatDetail.createRoute(conversationId, otherUserId, username, isOnline))
+                    },
                     onNewChatClick = { navController.navigate(Screen.Search.route) }
                 )
             }
             composable(Screen.Search.route) {
                 SearchScreen(
-                    onStartChatClick = { conversationId -> navController.navigate(Screen.ChatDetail.createRoute(conversationId)) }
+                    onStartChatClick = { conversationId ->
+                        navController.navigate(Screen.ChatDetail.createRoute(conversationId, "", "Chat", false))
+                    }
                 )
             }
             composable(Screen.Calls.route) {
-                CallHistoryScreen(onCallEntryClick = {}, onAudioCallClick = {}, onVideoCallClick = {})
+                CallHistoryScreen(
+                    onAudioCallClick = { otherUserId, username ->
+                        callViewModel.startCall(otherUserId, username, conversationId = "")
+                        navController.navigate(Screen.ActiveCall.createRoute(otherUserId))
+                    }
+                )
             }
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    username = "Habishek", email = "", avatarUrl = null,
-                    onSettingsClick = {}, onLogoutClick = {}
+                    onLoggedOut = { navController.navigate(Screen.Login.route) { popUpTo(0) } }
                 )
             }
-            composable(Screen.ChatDetail.route) {
+            composable(Screen.ChatDetail.route) { backStackEntry ->
+                val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
+                val username = backStackEntry.arguments?.getString("username") ?: "Chat"
+                val otherUserId = backStackEntry.arguments?.getString("otherUserId") ?: ""
+                val isOnline = backStackEntry.arguments?.getString("isOnline")?.toBoolean() ?: false
                 ChatDetailScreen(
-                    contactName = "Chat",
-                    onBackClick = { navController.popBackStack() }
+                    contactName = username,
+                    otherUserId = otherUserId,
+                    conversationId = conversationId,
+                    isOnline = isOnline,
+                    onBackClick = { navController.popBackStack() },
+                    onStartCall = { navController.navigate(Screen.ActiveCall.createRoute(otherUserId)) }
+                )
+            }
+            composable(Screen.IncomingCall.route) {
+                IncomingCallScreen(
+                    onCallAccepted = {
+                        navController.navigate(Screen.ActiveCall.createRoute("")) {
+                            popUpTo(Screen.IncomingCall.route) { inclusive = true }
+                        }
+                    },
+                    onCallDeclined = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.ActiveCall.route) {
+                ActiveCallScreen(
+                    onCallEnded = { navController.popBackStack(Screen.Chats.route, inclusive = false) }
                 )
             }
         }
     }
 }
-

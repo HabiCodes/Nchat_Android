@@ -21,17 +21,23 @@ class ChatListViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ChatListUiState())
+    private val cached = chatRepository.conversationsCache.value
+    private val _uiState = MutableStateFlow(
+        ChatListUiState(conversations = cached, isLoading = cached.isEmpty())
+    )
     val uiState: StateFlow<ChatListUiState> = _uiState
 
     init { loadConversations() }
 
     fun loadConversations() {
-        _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        // Only show the spinner if we have nothing cached to show meanwhile
+        if (_uiState.value.conversations.isEmpty()) {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+        }
         viewModelScope.launch {
             chatRepository.getConversations()
                 .onSuccess { _uiState.value = ChatListUiState(conversations = it) }
-                .onFailure { _uiState.value = ChatListUiState(error = it.message) }
+                .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = it.message) }
         }
     }
 }

@@ -22,7 +22,7 @@ import com.jarvis.nchat.presentation.components.OnlineStatusDot
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatListScreen(
-    onChatClick: (String) -> Unit,
+    onChatClick: (conversationId: String, otherUserId: String, username: String, isOnline: Boolean) -> Unit,
     onNewChatClick: () -> Unit,
     viewModel: ChatListViewModel = hiltViewModel(),
 ) {
@@ -52,7 +52,9 @@ fun ChatListScreen(
                 )
                 else -> LazyColumn(contentPadding = PaddingValues(vertical = Spacing.sm)) {
                     items(uiState.conversations, key = { it.id }) { conv ->
-                        ChatRow(conv = conv, onClick = { onChatClick(conv.id) })
+                        ChatRow(conv = conv, onClick = {
+                            onChatClick(conv.id, conv.otherUserId, conv.otherUsername, conv.otherIsOnline)
+                        })
                     }
                 }
             }

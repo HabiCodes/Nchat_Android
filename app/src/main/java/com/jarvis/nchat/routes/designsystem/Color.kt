@@ -1,4 +1,4 @@
-package com.jarvis.nchat.routes.designsystem
+package com.jarvis.nchat.core.designsystem
 
 import androidx.compose.ui.graphics.Color
 
@@ -31,3 +31,4 @@ val ReadTickBlue = Color(0xFF4FC3F7)
 
 val DividerDark = Color(0xFF26262F)
 val DividerLight = Color(0xFFE4E3EC)
+

@@ -11,6 +11,9 @@ interface ApiService {
     @POST("api/auth/login")
     suspend fun login(@Body body: LoginRequest): AuthResponse
 
+    @POST("api/auth/change-password")
+    suspend fun changePassword(@Body body: ChangePasswordRequest): Map<String, Boolean>
+
     @GET("api/auth/me")
     suspend fun getMe(): AuthResponse
 
@@ -29,4 +32,6 @@ interface ApiService {
         @Query("before") before: String? = null,
         @Query("limit") limit: Int = 50,
     ): MessageListResponse
+    @GET("api/calls")
+    suspend fun getCalls(): CallListResponse
 }

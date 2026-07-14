@@ -9,6 +9,7 @@ import com.jarvis.nchat.domain.model.User
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.jarvis.nchat.data.model.ChangePasswordRequest
 
 @Singleton
 class AuthRepository @Inject constructor(
@@ -38,6 +39,17 @@ class AuthRepository @Inject constructor(
         tokenDataStore.saveSession(response.token, response.user.id)
         socketManager.connect(response.token)
         response.user.toDomain()
+    }
+    suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit> = runCatching {
+        try {
+            api.changePassword(ChangePasswordRequest(currentPassword, newPassword))
+            Unit
+        } catch (e: retrofit2.HttpException) {
+            val errorBody = e.response()?.errorBody()?.string()
+            val message = try { org.json.JSONObject(errorBody ?: "").optString("error", "Failed to change password") }
+            catch (p: Exception) { "Failed to change password" }
+            throw Exception(message)
+        }
     }
 
     suspend fun getCurrentUser(): Result<User> = runCatching {

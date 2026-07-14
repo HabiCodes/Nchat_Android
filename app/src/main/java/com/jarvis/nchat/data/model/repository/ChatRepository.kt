@@ -21,8 +21,11 @@ class ChatRepository @Inject constructor(
     private val socketManager: SocketManager,
     private val tokenDataStore: TokenDataStore,
 ) {
+    private val _conversationsCache = kotlinx.coroutines.flow.MutableStateFlow<List<Conversation>>(emptyList())
+    val conversationsCache: kotlinx.coroutines.flow.StateFlow<List<Conversation>> = _conversationsCache
+
     suspend fun getConversations(): Result<List<Conversation>> = runCatching {
-        api.getConversations().conversations.map {
+        val convos = api.getConversations().conversations.map {
             Conversation(
                 id = it.conversation_id,
                 otherUserId = it.other_user_id.orEmpty(),
@@ -33,6 +36,8 @@ class ChatRepository @Inject constructor(
                 lastMessageAt = it.last_message_at,
             )
         }
+        _conversationsCache.value = convos
+        convos
     }
 
     suspend fun startConversation(otherUserId: String): Result<String> = runCatching {
@@ -76,6 +81,7 @@ class ChatRepository @Inject constructor(
 
     fun markConversationRead(conversationId: String) = socketManager.markRead(conversationId)
     fun emitTyping(conversationId: String) = socketManager.emitTypingStart(conversationId)
+
 }
 
 private fun MessageDto.toDomain(myId: String?) = Message(

@@ -24,7 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.jarvis.nchat.core.designsystem.ChatAppTheme
 import com.jarvis.nchat.core.designsystem.IncomingBubbleShape
 import com.jarvis.nchat.core.designsystem.OutgoingBubbleShape
-import com.jarvis.nchat.routes.designsystem.ReadTickBlue
+import com.jarvis.nchat.core.designsystem.ReadTickBlue
 import com.jarvis.nchat.core.designsystem.Spacing
 
 enum class MessageStatus { SENDING, SENT, DELIVERED, READ }

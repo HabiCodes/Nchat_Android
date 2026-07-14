@@ -9,7 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.jarvis.nchat.routes.designsystem.OnlineGreen
+import com.jarvis.nchat.core.designsystem.OnlineGreen
 
 @Composable
 fun OnlineStatusDot(modifier: Modifier = Modifier, size: Int = 14) {

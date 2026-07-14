@@ -1,10 +1,10 @@
 package com.jarvis.nchat.presentation.search
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jarvis.nchat.core.designsystem.ChatAppTheme
 import com.jarvis.nchat.core.designsystem.Spacing
@@ -48,19 +49,50 @@ fun SearchScreen(
                     focusedIndicatorColor = Color.Transparent,
                 )
             )
+
             if (uiState.isLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-            LazyColumn(contentPadding = PaddingValues(bottom = Spacing.lg)) {
-                items(uiState.results, key = { it.id }) { user ->
-                    SearchResultRow(user = user, onChatClick = {
-                        scope.launch {
-                            viewModel.startChatWith(user.id)?.let { onStartChatClick(it) }
-                        }
-                    })
+
+            if (uiState.query.isBlank()) {
+                EmptySearchState()
+            } else {
+                LazyColumn(contentPadding = PaddingValues(bottom = Spacing.lg)) {
+                    items(uiState.results, key = { it.id }) { user ->
+                        SearchResultRow(
+                            user = user,
+                            onChatClick = {
+                                scope.launch {
+                                    viewModel.startChatWith(user.id)?.let { onStartChatClick(it) }
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EmptySearchState() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(Spacing.xxl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Filled.PersonSearch,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = ChatAppTheme.extendedColors.textSecondary
+        )
+        Spacer(Modifier.height(Spacing.md))
+        Text(
+            "Find people by their username",
+            style = MaterialTheme.typography.bodyMedium,
+            color = ChatAppTheme.extendedColors.textSecondary
+        )
     }
 }
 
@@ -77,8 +109,14 @@ private fun SearchResultRow(user: User, onChatClick: () -> Unit) {
         Spacer(Modifier.width(Spacing.md))
         Column(modifier = Modifier.weight(1f)) {
             Text(user.username, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(if (user.isOnline) "Online" else "Offline", style = MaterialTheme.typography.bodySmall, color = ChatAppTheme.extendedColors.textSecondary)
+            Text(
+                if (user.isOnline) "Online" else "Offline",
+                style = MaterialTheme.typography.bodySmall,
+                color = ChatAppTheme.extendedColors.textSecondary
+            )
         }
-        Button(onClick = onChatClick, shape = MaterialTheme.shapes.extraLarge) { Text("Chat") }
+        Button(onClick = onChatClick, shape = MaterialTheme.shapes.extraLarge) {
+            Text("Chat")
+        }
     }
 }

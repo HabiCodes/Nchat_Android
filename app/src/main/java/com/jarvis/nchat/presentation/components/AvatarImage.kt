@@ -14,7 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.jarvis.nchat.routes.designsystem.AccentPrimary
+import com.jarvis.nchat.core.designsystem.AccentPrimary
 
 @Composable
 fun AvatarImage(

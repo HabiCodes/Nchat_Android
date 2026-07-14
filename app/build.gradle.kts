@@ -72,4 +72,6 @@ dependencies {
     implementation("io.socket:socket.io-client:2.1.0") { exclude(group = "org.json", module = "json") }
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
+    implementation(libs.stream.webrtc.android)
 }
