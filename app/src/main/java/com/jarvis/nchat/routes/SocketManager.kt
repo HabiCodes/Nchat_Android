@@ -34,6 +34,10 @@ class SocketManager @Inject constructor() {
         pendingListeners.forEach { (event, listener) -> socket?.on(event, listener) }
         socket?.connect()
     }
+    fun forceReconnect(token: String) {
+        disconnect()
+        connect(token)
+    }
 
     fun disconnect() {
         socket?.disconnect()

@@ -142,13 +142,12 @@ class CallViewModel @Inject constructor(
         socketManager.observeCallIncoming().collect { data ->
             onIncomingCall(
                 fromUserId = data.getString("fromUserId"),
-                fromUsername = "Someone", // TODO: look up real username, backend only sends id
+                fromUsername = data.optString("fromUsername", "Unknown"),
                 conversationId = data.optString("conversationId"),
                 callId = data.optString("callId").takeIf { it.isNotBlank() }
             )
         }
     }
-
     private fun listenForCallAccepted() = viewModelScope.launch {
         socketManager.observeCallAccepted().collect {
             _uiState.value = _uiState.value.copy(status = CallStatus.CONNECTING)

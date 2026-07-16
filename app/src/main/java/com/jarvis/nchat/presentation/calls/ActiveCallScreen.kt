@@ -23,7 +23,7 @@ import com.jarvis.nchat.core.designsystem.Spacing
 import com.jarvis.nchat.presentation.components.AvatarImage
 import kotlinx.coroutines.delay
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.platform.LocalContext
+
 
 
 @Composable

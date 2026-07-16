@@ -67,8 +67,9 @@ class AuthRepository @Inject constructor(
 
     // Called once at app startup to resume the socket connection if a token already exists
     suspend fun reconnectSocketIfLoggedIn() {
-        tokenDataStore.token.first()?.let { socketManager.connect(it) }
+        tokenDataStore.token.first()?.let { socketManager.forceReconnect(it) }
     }
+
 }
 
 private fun com.jarvis.nchat.data.model.UserDto.toDomain() = User(
