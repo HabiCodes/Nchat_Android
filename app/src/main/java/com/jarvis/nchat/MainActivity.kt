@@ -1,10 +1,15 @@
 package com.jarvis.nchat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -20,9 +25,16 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var authRepository: AuthRepository
 
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* granted or denied - either way, app continues normally.
+           If denied, incoming-call and message pushes simply won't show
+           a system notification, but the app keeps working otherwise. */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestNotificationPermissionIfNeeded()
         setContent {
             var startDestination by remember { mutableStateOf<String?>(null) }
 
@@ -51,6 +63,22 @@ class MainActivity : ComponentActivity() {
             ChatAppTheme {
                 startDestination?.let { ChatAppRoot(startDestination = it) }
             }
+        }
+    }
+
+    // Android 13+ requires explicitly asking for notification permission at
+    // runtime - declaring it in the manifest alone does nothing. Without
+    // this, NotificationManager.notify() silently no-ops: no crash, no
+    // error, the notification just never appears.
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val alreadyGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (!alreadyGranted) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.jarvis.nchat.data.repository
 
+import com.google.firebase.messaging.FirebaseMessaging
 import com.jarvis.nchat.core.datastore.TokenDataStore
 import com.jarvis.nchat.core.network.ApiService
 import com.jarvis.nchat.core.network.FcmTokenRequest
@@ -12,9 +13,12 @@ import com.jarvis.nchat.data.model.RegisterRequest
 import com.jarvis.nchat.data.model.VerifyOtpRequest
 import com.jarvis.nchat.domain.model.User
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.suspendCancellableCoroutine
 import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 @Singleton
 class AuthRepository @Inject constructor(
@@ -39,6 +43,7 @@ class AuthRepository @Inject constructor(
             val response = api.registerVerify(VerifyOtpRequest(email, code))
             tokenDataStore.saveSession(response.token, response.user.id)
             socketManager.connect(response.token)
+            registerFcmTokenSilently()
             response.user.toDomain()
         } catch (e: HttpException) {
             throw Exception(e.parsedMessage("Verification failed"))
@@ -52,6 +57,7 @@ class AuthRepository @Inject constructor(
             val response = api.login(LoginRequest(email, password))
             tokenDataStore.saveSession(response.token, response.user.id)
             socketManager.connect(response.token)
+            registerFcmTokenSilently()
             response.user.toDomain()
         } catch (e: HttpException) {
             throw Exception(e.parsedMessage("Login failed"))
@@ -119,6 +125,26 @@ class AuthRepository @Inject constructor(
     suspend fun registerFcmToken(fcmToken: String): Result<Unit> = runCatching {
         api.registerFcmToken(FcmTokenRequest(fcmToken))
         Unit
+    }
+
+    /**
+     * Fetches the device's current FCM token and sends it to the backend.
+     * Called right after login/registration succeeds. Failure here (no
+     * network, Play Services unavailable, etc.) must NEVER block or fail
+     * the login/register flow itself - calls just won't push-wake this
+     * device until the token is retried on a future login.
+     */
+    private suspend fun registerFcmTokenSilently() {
+        runCatching {
+            val token = getFcmToken()
+            registerFcmToken(token)
+        }
+    }
+
+    private suspend fun getFcmToken(): String = suspendCancellableCoroutine { continuation ->
+        FirebaseMessaging.getInstance().token
+            .addOnSuccessListener { token -> continuation.resume(token) }
+            .addOnFailureListener { error -> continuation.resumeWithException(error) }
     }
 }
 

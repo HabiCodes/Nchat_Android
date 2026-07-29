@@ -10,14 +10,14 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- NEW — resolves the lint warning. required="false" for every one of
-         these: none should block installation on a device that lacks it,
-         since audio calling only strictly needs a microphone, and even that
-         should degrade gracefully rather than block the install. -->
+    <!-- required="false" for every one of these: none should block
+         installation on a device that lacks it, since audio calling only
+         strictly needs a microphone, and even that should degrade
+         gracefully rather than block the install. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -48,7 +48,6 @@
         <activity
             android:name=".presentation.calls.IncomingCallActivity"
             android:exported="false"
-            android:showOnLockScreen="true"
             android:excludeFromRecents="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.Nchat" />
@@ -64,7 +63,7 @@
         <service
             android:name=".core.call.CallForegroundService"
             android:exported="false"
-            android:foregroundServiceType="phoneCall" />
+            android:foregroundServiceType="microphone" />
 
     </application>
 
