@@ -1,65 +1,70 @@
 package com.jarvis.nchat.core.designsystem
 
-
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.jarvis.nchat.core.designsystem.BackgroundLight
-import com.jarvis.nchat.core.designsystem.ErrorRed
-import com.jarvis.nchat.core.designsystem.AccentPrimary
-import com.jarvis.nchat.core.designsystem.AccentSecondary
-import com.jarvis.nchat.core.designsystem.BackgroundDark
-import com.jarvis.nchat.core.designsystem.SurfaceDark
-import com.jarvis.nchat.core.designsystem.SurfaceDarkElevated
-import com.jarvis.nchat.core.designsystem.TextPrimaryDark
-import com.jarvis.nchat.core.designsystem.SurfaceLight
-import com.jarvis.nchat.core.designsystem.SurfaceLightElevated
-import com.jarvis.nchat.core.designsystem.TextPrimaryLight
-import com.jarvis.nchat.core.designsystem.SurfaceDarkChatBubbleIncoming
-import com.jarvis.nchat.core.designsystem.SurfaceDarkChatBubbleOutgoing
-import com.jarvis.nchat.core.designsystem.DividerDark
-import com.jarvis.nchat.core.designsystem.TextSecondaryDark
-import com.jarvis.nchat.core.designsystem.OnlineGreen
-import com.jarvis.nchat.core.designsystem.SurfaceLightChatBubbleIncoming
-import com.jarvis.nchat.core.designsystem.SurfaceLightChatBubbleOutgoing
-import com.jarvis.nchat.core.designsystem.DividerLight
-import com.jarvis.nchat.core.designsystem.TextSecondaryLight
-import com.jarvis.nchat.core.designsystem.ChatAppTypography
 
 private val DarkScheme = darkColorScheme(
     primary = AccentPrimary,
+    onPrimary = TextPrimaryDark,
+    errorContainer = ErrorRed.copy(alpha = 0.12f),
+    onErrorContainer = ErrorRed,
     secondary = AccentSecondary,
+    onSecondary = BackgroundDark,
     background = BackgroundDark,
-    surface = SurfaceDark,
-    surfaceVariant = SurfaceDarkElevated,
     onBackground = TextPrimaryDark,
+    surface = SurfaceDark,
     onSurface = TextPrimaryDark,
+    surfaceVariant = SurfaceDarkElevated,
+    onSurfaceVariant = TextSecondaryDark,
+    outline = DividerDark,
+    outlineVariant = DividerDark,
     error = ErrorRed,
+    onError = TextPrimaryDark,
 )
 
 private val LightScheme = lightColorScheme(
     primary = AccentPrimary,
+    onPrimary = TextPrimaryDark, // near-white reads fine on AccentPrimary in both themes
     secondary = AccentSecondary,
+    onSecondary = BackgroundDark,
     background = BackgroundLight,
-    surface = SurfaceLight,
-    surfaceVariant = SurfaceLightElevated,
     onBackground = TextPrimaryLight,
+    surface = SurfaceLight,
     onSurface = TextPrimaryLight,
+    surfaceVariant = SurfaceLightElevated,
+    onSurfaceVariant = TextSecondaryLight,
+    outline = DividerLight,
+    outlineVariant = DividerLight,
     error = ErrorRed,
+    onError = TextPrimaryDark,
+    errorContainer = ErrorRed.copy(alpha = 0.12f),
+    onErrorContainer = ErrorRed,
 )
 
+/**
+ * Colors used across NChat that have no equivalent slot in Material3's
+ * [androidx.compose.material3.ColorScheme] (chat bubbles, presence indicator, etc).
+ * Marked [Immutable] so Compose can skip recomposition for readers of
+ * [ChatAppTheme.extendedColors] when nothing has actually changed.
+ */
+@Immutable
 data class ExtendedColors(
-    val bubbleIncoming: androidx.compose.ui.graphics.Color,
-    val bubbleOutgoing: androidx.compose.ui.graphics.Color,
-    val divider: androidx.compose.ui.graphics.Color,
-    val textSecondary: androidx.compose.ui.graphics.Color,
-    val online: androidx.compose.ui.graphics.Color,
+    val bubbleIncoming: Color,
+    val bubbleOutgoing: Color,
+    val divider: Color,
+    val textSecondary: Color,
+    val online: Color,
 )
 
 val LocalExtendedColors = staticCompositionLocalOf {
@@ -92,16 +97,22 @@ fun ChatAppTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         val activity = view.context as? android.app.Activity
-        activity?.window?.let { window ->
-            window.statusBarColor = colorScheme.background.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+        // SideEffect ensures this runs only after a successful composition,
+        // not on every recomposition — window/system calls are effects, not
+        // pure UI output, so they don't belong directly in the composable body.
+        SideEffect {
+            activity?.window?.let { window ->
+                window.statusBarColor = colorScheme.background.toArgb()
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            }
         }
     }
 
-    androidx.compose.runtime.CompositionLocalProvider(LocalExtendedColors provides extended) {
+    CompositionLocalProvider(LocalExtendedColors provides extended) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = ChatAppTypography,
+            shapes = ChatAppShapes, // was missing — every MaterialTheme.shapes.* call was silently using M3 defaults
             content = content
         )
     }

@@ -8,6 +8,21 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.CAMERA" />
 
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- NEW — resolves the lint warning. required="false" for every one of
+         these: none should block installation on a device that lacks it,
+         since audio calling only strictly needs a microphone, and even that
+         should degrade gracefully rather than block the install. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
     <application
         android:name=".ChatApplication"
         android:allowBackup="true"
@@ -18,6 +33,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Nchat">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,10 +41,31 @@
             android:theme="@style/Theme.Nchat">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".presentation.calls.IncomingCallActivity"
+            android:exported="false"
+            android:showOnLockScreen="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Nchat" />
+
+        <service
+            android:name=".core.fcm.NChatFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".core.call.CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
+
     </application>
 
 </manifest>

@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     id("kotlin-kapt")
     id("com.google.dagger.hilt.android")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -74,4 +75,9 @@ dependencies {
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     implementation(libs.stream.webrtc.android)
+
+
+    // Firebase Cloud Messaging - push notifications for calls/messages when app is backgrounded
+    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 }

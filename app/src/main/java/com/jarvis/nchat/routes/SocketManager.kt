@@ -18,10 +18,6 @@ private const val SOCKET_URL = "https://n-backend-6xhg.onrender.com"
 class SocketManager @Inject constructor() {
     private var socket: Socket? = null
     private val gson = Gson()
-
-    // Listeners registered before the socket exists get queued here, then
-    // attached the moment connect() creates the real Socket object - this is
-    // what fixes calls/messages never arriving after a fresh login.
     private val pendingListeners = mutableListOf<Pair<String, Emitter.Listener>>()
 
     fun connect(token: String) {
@@ -29,11 +25,29 @@ class SocketManager @Inject constructor() {
         val options = IO.Options().apply {
             auth = mapOf("token" to token)
             transports = arrayOf("websocket")
+            reconnection = true
+            reconnectionAttempts = Int.MAX_VALUE
+            reconnectionDelay = 1000
+            reconnectionDelayMax = 5000
         }
         socket = IO.socket(SOCKET_URL, options)
-        pendingListeners.forEach { (event, listener) -> socket?.on(event, listener) }
+
+        socket?.on(Socket.EVENT_CONNECT) {
+            synchronized(pendingListeners) {
+                pendingListeners.forEach { (event, listener) ->
+                    socket?.off(event, listener)
+                    socket?.on(event, listener)
+                }
+            }
+        }
+        synchronized(pendingListeners) {
+            pendingListeners.forEach { (event, listener) -> socket?.on(event, listener) }
+        }
         socket?.connect()
     }
+
+    fun isConnected(): Boolean = socket?.connected() == true
+
     fun forceReconnect(token: String) {
         disconnect()
         connect(token)
@@ -43,16 +57,17 @@ class SocketManager @Inject constructor() {
         socket?.disconnect()
         socket?.off()
         socket = null
-        pendingListeners.clear()
     }
 
     private fun addListener(event: String, listener: Emitter.Listener) {
-        pendingListeners.add(event to listener)
+        synchronized(pendingListeners) { pendingListeners.add(event to listener) }
         socket?.on(event, listener)
     }
 
     private fun removeListener(event: String, listener: Emitter.Listener) {
-        pendingListeners.removeAll { it.first == event && it.second === listener }
+        synchronized(pendingListeners) {
+            pendingListeners.removeAll { it.first == event && it.second === listener }
+        }
         socket?.off(event, listener)
     }
 
@@ -61,6 +76,8 @@ class SocketManager @Inject constructor() {
         addListener(event, listener)
         awaitClose { removeListener(event, listener) }
     }
+
+    // ---------------- Messaging ----------------
 
     fun observeNewMessages(): Flow<MessageDto> = callbackFlow {
         val listener = Emitter.Listener { args ->
@@ -97,6 +114,8 @@ class SocketManager @Inject constructor() {
     fun observeTypingStop(): Flow<JSONObject> = observeSocketEvent("typing:stop")
     fun observeMessageRead(): Flow<JSONObject> = observeSocketEvent("message:read")
 
+    // ---------------- Calling: emit ----------------
+
     fun emitCallInvite(toUserId: String, conversationId: String, callType: String, onAck: (JSONObject) -> Unit) {
         val payload = JSONObject().apply {
             put("toUserId", toUserId); put("conversationId", conversationId); put("callType", callType)
@@ -118,25 +137,28 @@ class SocketManager @Inject constructor() {
         socket?.emit("call:reject", payload)
     }
 
-    fun emitCallOffer(toUserId: String, sdp: String, type: String) {
+    fun emitCallOffer(toUserId: String, callId: String?, sdp: String, type: String) {
         val payload = JSONObject().apply {
             put("toUserId", toUserId)
+            put("callId", callId)
             put("sdp", JSONObject().apply { put("sdp", sdp); put("type", type) })
         }
         socket?.emit("call:offer", payload)
     }
 
-    fun emitCallAnswer(toUserId: String, sdp: String, type: String) {
+    fun emitCallAnswer(toUserId: String, callId: String?, sdp: String, type: String) {
         val payload = JSONObject().apply {
             put("toUserId", toUserId)
+            put("callId", callId)
             put("sdp", JSONObject().apply { put("sdp", sdp); put("type", type) })
         }
         socket?.emit("call:answer", payload)
     }
 
-    fun emitIceCandidate(toUserId: String, candidate: String, sdpMid: String?, sdpMLineIndex: Int) {
+    fun emitIceCandidate(toUserId: String, callId: String?, candidate: String, sdpMid: String?, sdpMLineIndex: Int) {
         val payload = JSONObject().apply {
             put("toUserId", toUserId)
+            put("callId", callId)
             put("candidate", JSONObject().apply {
                 put("candidate", candidate); put("sdpMid", sdpMid); put("sdpMLineIndex", sdpMLineIndex)
             })
@@ -151,6 +173,8 @@ class SocketManager @Inject constructor() {
         socket?.emit("call:end", payload)
     }
 
+    // ---------------- Calling: observe ----------------
+
     fun observeCallIncoming(): Flow<JSONObject> = observeSocketEvent("call:incoming")
     fun observeCallAccepted(): Flow<JSONObject> = observeSocketEvent("call:accepted")
     fun observeCallRejected(): Flow<JSONObject> = observeSocketEvent("call:rejected")
@@ -158,4 +182,5 @@ class SocketManager @Inject constructor() {
     fun observeCallAnswer(): Flow<JSONObject> = observeSocketEvent("call:answer")
     fun observeCallIceCandidate(): Flow<JSONObject> = observeSocketEvent("call:ice-candidate")
     fun observeCallEnded(): Flow<JSONObject> = observeSocketEvent("call:ended")
+    fun observeCallMissed(): Flow<JSONObject> = observeSocketEvent("call:missed")
 }

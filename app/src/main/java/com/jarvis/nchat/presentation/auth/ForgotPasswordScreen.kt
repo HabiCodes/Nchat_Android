@@ -3,63 +3,49 @@ package com.jarvis.nchat.presentation.auth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jarvis.nchat.core.designsystem.Spacing
-import com.jarvis.nchat.presentation.auth.components.ErrorCard
-import com.jarvis.nchat.presentation.auth.components.LoadingOverlay
-import com.jarvis.nchat.presentation.auth.components.NChatButton
 import com.jarvis.nchat.core.designsystem.components.NChatTextField
-import com.jarvis.nchat.core.designsystem.components.NChatTextFieldDefaults
-import com.jarvis.nchat.core.designsystem.components.PasswordField
+import com.jarvis.nchat.presentation.auth.components.ErrorCard
+import com.jarvis.nchat.presentation.auth.components.NChatButton
 import com.jarvis.nchat.presentation.auth.components.ScreenHeader
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.runtime.collectAsState
 
-/**
- * Login screen — built entirely from the NChat UI Kit. No raw Material
- * components (`OutlinedTextField`, `Button`) are used directly here; every
- * visual element is one of [NChatTextField], [PasswordField], [NChatButton],
- * [ErrorCard], or [ScreenHeader], so this screen automatically inherits any
- * future design-system-wide change with zero edits.
- */
 @Composable
-fun LoginScreen(
-    onLoginSuccess: () -> Unit,
-    onNavigateToRegister: () -> Unit,
-    onNavigateToForgotPassword: () -> Unit,
+fun ForgotPasswordScreen(
+    onOtpSent: (email: String) -> Unit,
+    onBack: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel(),
 ) {
     var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
-    val focusManager = LocalFocusManager.current
 
     val isLoading = uiState is AuthUiState.Loading
     val errorMessage = (uiState as? AuthUiState.Error)?.message
 
     LaunchedEffect(uiState) {
-        if (uiState is AuthUiState.Success) onLoginSuccess()
+        val state = uiState
+        if (state is AuthUiState.ResetOtpSent) onOtpSent(state.email)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -71,8 +57,8 @@ fun LoginScreen(
                 verticalArrangement = Arrangement.Center,
             ) {
                 ScreenHeader(
-                    title = "Welcome back",
-                    subtitle = "Log in to continue chatting",
+                    title = "Reset your password",
+                    subtitle = "Enter your account email and we'll send a code",
                 )
                 Spacer(Modifier.height(Spacing.xxl))
 
@@ -88,27 +74,10 @@ fun LoginScreen(
                     isError = errorMessage != null,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Email,
-                        imeAction = ImeAction.Next,
+                        imeAction = ImeAction.Done,
                     ),
                     keyboardActions = KeyboardActions(
-                        onNext = { focusManager.moveFocus(FocusDirection.Down) },
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(Spacing.md))
-
-                PasswordField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        viewModel.clearError()
-                    },
-                    label = "Password",
-                    enabled = !isLoading,
-                    isError = errorMessage != null,
-                    imeAction = ImeAction.Done,
-                    keyboardActions = KeyboardActions(
-                        onDone = { viewModel.login(email.trim(), password) },
+                        onDone = { viewModel.requestPasswordReset(email.trim()) },
                     ),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -120,36 +89,24 @@ fun LoginScreen(
                 }
 
                 NChatButton(
-                    text = "Log in",
-                    onClick = { viewModel.login(email.trim(), password) },
+                    text = "Send code",
+                    onClick = { viewModel.requestPasswordReset(email.trim()) },
                     enabled = !isLoading,
                     isLoading = isLoading,
                 )
                 Spacer(Modifier.height(Spacing.md))
 
                 TextButton(
-                    onClick = onNavigateToRegister,
+                    onClick = onBack,
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isLoading,
                 ) {
                     Text(
-                        text = "Don't have an account? Register",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                TextButton(
-                    onClick = onNavigateToForgotPassword,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading,
-                ) {
-                    Text(
-                        text = "Forgot password?",
+                        text = "Back to login",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
         }
-
-        LoadingOverlay(isVisible = false) // reserved for future full-screen ops (e.g. post-login sync); form submit uses NChatButton's own isLoading instead
     }
 }

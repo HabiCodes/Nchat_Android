@@ -2,7 +2,7 @@ package com.jarvis.nchat.presentation.calls
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.jarvis.nchat.data.repository.CallRepository
+import com.jarvis.nchat.data.repository.CallHistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,14 +13,14 @@ data class CallHistoryUiState(val calls: List<CallLogEntry> = emptyList(), val i
 
 @HiltViewModel
 class CallHistoryViewModel @Inject constructor(
-    private val callRepository: CallRepository,
+    private val callHistoryRepository: CallHistoryRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CallHistoryUiState())
     val uiState: StateFlow<CallHistoryUiState> = _uiState
 
     init {
         viewModelScope.launch {
-            callRepository.getCallHistory()
+            callHistoryRepository.getCallHistory()
                 .onSuccess { _uiState.value = CallHistoryUiState(calls = it, isLoading = false) }
                 .onFailure { _uiState.value = CallHistoryUiState(isLoading = false) }
         }

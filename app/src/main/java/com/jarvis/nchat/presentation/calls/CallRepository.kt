@@ -8,12 +8,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class CallRepository @Inject constructor(private val api: ApiService) {
+class CallHistoryRepository @Inject constructor(private val api: ApiService) {
     suspend fun getCallHistory(): Result<List<CallLogEntry>> = runCatching {
         api.getCalls().calls.map {
             CallLogEntry(
                 id = it.id,
-                name = it.other_username,
+                name = it.other_username ?: "Unknown", // FIXED: null username would otherwise crash CallLogEntry's UI (Text(null) throws)
                 avatarUrl = it.other_avatar_url,
                 otherUserId = it.other_user_id,
                 direction = when {

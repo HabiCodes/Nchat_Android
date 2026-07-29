@@ -1,18 +1,43 @@
 package com.jarvis.nchat.presentation.auth
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.jarvis.nchat.core.designsystem.Spacing
+import com.jarvis.nchat.presentation.auth.components.ErrorCard
+import com.jarvis.nchat.presentation.auth.components.LoadingOverlay
+import com.jarvis.nchat.presentation.auth.components.NChatButton
+import com.jarvis.nchat.core.designsystem.components.NChatTextField
+import com.jarvis.nchat.core.designsystem.components.PasswordField
+import com.jarvis.nchat.presentation.auth.components.ScreenHeader
 
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
+    onOtpSent: (email: String) -> Unit,
     onNavigateToLogin: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel(),
 ) {
@@ -20,44 +45,112 @@ fun RegisterScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val uiState by viewModel.uiState.collectAsState()
+    val focusManager = LocalFocusManager.current
+
+    val isLoading = uiState is AuthUiState.Loading
+    val errorMessage = (uiState as? AuthUiState.Error)?.message
 
     LaunchedEffect(uiState) {
-        if (uiState is AuthUiState.Success) onRegisterSuccess()
+        val state = uiState
+        if (state is AuthUiState.RegisterOtpSent) onOtpSent(state.email)
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(Spacing.xl),
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Create account", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(Spacing.xxl))
+    Box(modifier = Modifier.fillMaxSize()) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(Spacing.xl),
+                verticalArrangement = Arrangement.Center,
+            ) {
+                ScreenHeader(
+                    title = "Create account",
+                    subtitle = "Join NChat and start messaging",
+                )
+                Spacer(Modifier.height(Spacing.xxl))
 
-        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Spacer(Modifier.height(Spacing.md))
-        OutlinedTextField(value = email, onValueChange = { email = it }, label = { Text("Email") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-        Spacer(Modifier.height(Spacing.md))
-        OutlinedTextField(value = password, onValueChange = { password = it }, label = { Text("Password") }, modifier = Modifier.fillMaxWidth(), singleLine = true, visualTransformation = PasswordVisualTransformation())
-        Spacer(Modifier.height(Spacing.lg))
+                NChatTextField(
+                    value = username,
+                    onValueChange = {
+                        username = it
+                        viewModel.clearError()
+                    },
+                    label = "Username",
+                    enabled = !isLoading,
+                    isError = errorMessage != null,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(Spacing.md))
 
-        if (uiState is AuthUiState.Error) {
-            Text((uiState as AuthUiState.Error).message, color = MaterialTheme.colorScheme.error)
-            Spacer(Modifier.height(Spacing.sm))
-        }
+                NChatTextField(
+                    value = email,
+                    onValueChange = {
+                        email = it
+                        viewModel.clearError()
+                    },
+                    label = "Email",
+                    placeholder = "you@example.com",
+                    enabled = !isLoading,
+                    isError = errorMessage != null,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next,
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(Spacing.md))
 
-        Button(
-            onClick = { viewModel.register(username.trim(), email.trim(), password) },
-            modifier = Modifier.fillMaxWidth().height(50.dp),
-            enabled = uiState !is AuthUiState.Loading
-        ) {
-            if (uiState is AuthUiState.Loading) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
-            } else {
-                Text("Register")
+                PasswordField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        viewModel.clearError()
+                    },
+                    label = "Password",
+                    supportingText = "At least 8 characters",
+                    enabled = !isLoading,
+                    isError = errorMessage != null,
+                    imeAction = ImeAction.Done,
+                    keyboardActions = KeyboardActions(
+                        onDone = { viewModel.register(username.trim(), email.trim(), password) },
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(Spacing.lg))
+
+                ErrorCard(message = errorMessage, modifier = Modifier.fillMaxWidth())
+                if (errorMessage != null) {
+                    Spacer(Modifier.height(Spacing.md))
+                }
+
+                NChatButton(
+                    text = "Register",
+                    onClick = { viewModel.register(username.trim(), email.trim(), password) },
+                    enabled = !isLoading,
+                    isLoading = isLoading,
+                )
+                Spacer(Modifier.height(Spacing.md))
+
+                TextButton(
+                    onClick = onNavigateToLogin,
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isLoading,
+                ) {
+                    Text(
+                        text = "Already have an account? Log in",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(Spacing.md))
-        TextButton(onClick = onNavigateToLogin, modifier = Modifier.fillMaxWidth()) {
-            Text("Already have an account? Log in")
-        }
+
+        LoadingOverlay(isVisible = false)
     }
 }

@@ -10,9 +10,10 @@ sealed class Screen(val route: String) {
         fun createRoute(conversationId: String, otherUserId: String, username: String, isOnline: Boolean) =
             "chat_detail/$conversationId?otherUserId=$otherUserId&username=$username&isOnline=$isOnline"
     }
-    object UserProfile : Screen("user_profile/{userId}") {
-        fun createRoute(userId: String) = "user_profile/$userId"
+    object UserProfile : Screen("user_profile/{userId}?username={username}") {
+        fun createRoute(userId: String, username: String) = "user_profile/$userId?username=$username"
     }
+
     object IncomingCall : Screen("incoming_call/{callerId}") {
         fun createRoute(callerId: String) = "incoming_call/$callerId"
     }
@@ -23,4 +24,14 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Login : Screen("login")
     object Register : Screen("register")
+    object VerifyRegisterOtp : Screen("verify_register_otp/{email}") {
+        fun createRoute(email: String) = "verify_register_otp/$email"
+    }
+    object ForgotPassword : Screen("forgot_password")
+    object VerifyResetOtp : Screen("verify_reset_otp/{email}") {
+        fun createRoute(email: String) = "verify_reset_otp/$email"
+    }
+    object ResetPassword : Screen("reset_password/{resetToken}") {
+        fun createRoute(resetToken: String) = "reset_password/$resetToken"
+    }
 }

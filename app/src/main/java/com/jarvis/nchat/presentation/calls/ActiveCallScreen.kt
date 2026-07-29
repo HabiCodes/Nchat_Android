@@ -32,7 +32,7 @@ fun ActiveCallScreen(
     viewModel: CallViewModel = hiltViewModel(LocalContext.current as ComponentActivity),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
+    
     var elapsedSeconds by remember { mutableStateOf(0) }
 
     LaunchedEffect(uiState.status) {
@@ -89,7 +89,7 @@ fun ActiveCallScreen(
                 CallToggleButton(
                     icon = Icons.Filled.VolumeUp,
                     isActive = uiState.isSpeakerOn,
-                    onClick = { viewModel.toggleSpeaker(context) }
+                    onClick = { viewModel.toggleSpeaker() }
                 )
             }
             Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {

@@ -20,11 +20,13 @@ import com.jarvis.nchat.domain.model.User
 import com.jarvis.nchat.presentation.components.AvatarImage
 import com.jarvis.nchat.presentation.components.OnlineStatusDot
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.clickable
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
-    onStartChatClick: (String) -> Unit,
+    onUserClick: (String, String) -> Unit,
+    onStartChatClick: (String, String, String) -> Unit, // conversationId, otherUserId, username
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -61,9 +63,12 @@ fun SearchScreen(
                     items(uiState.results, key = { it.id }) { user ->
                         SearchResultRow(
                             user = user,
+                            onUserClick = onUserClick,
                             onChatClick = {
                                 scope.launch {
-                                    viewModel.startChatWith(user.id)?.let { onStartChatClick(it) }
+                                    viewModel.startChatWith(user.id)?.let { conversationId ->
+                                        onStartChatClick(conversationId, user.id, user.username)
+                                    }
                                 }
                             }
                         )
@@ -72,6 +77,7 @@ fun SearchScreen(
             }
         }
     }
+
 }
 
 @Composable
@@ -97,12 +103,21 @@ private fun EmptySearchState() {
 }
 
 @Composable
-private fun SearchResultRow(user: User, onChatClick: () -> Unit) {
+private fun SearchResultRow(
+    user: User,
+    onUserClick: (String, String) -> Unit,
+    onChatClick: () -> Unit
+){
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onUserClick(user.id, user.username) }
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically
+
     ) {
         Box {
+
             AvatarImage(name = user.username, avatarUrl = user.avatarUrl, size = 48)
             if (user.isOnline) OnlineStatusDot(modifier = Modifier.align(Alignment.BottomEnd))
         }

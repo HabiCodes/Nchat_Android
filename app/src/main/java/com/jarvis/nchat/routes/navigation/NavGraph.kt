@@ -11,8 +11,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.jarvis.nchat.presentation.auth.ForgotPasswordScreen
 import com.jarvis.nchat.presentation.auth.LoginScreen
 import com.jarvis.nchat.presentation.auth.RegisterScreen
+import com.jarvis.nchat.presentation.auth.RegisterVerifyScreen
+import com.jarvis.nchat.presentation.auth.ResetPasswordScreen
+import com.jarvis.nchat.presentation.auth.ResetVerifyScreen
 import com.jarvis.nchat.presentation.calls.ActiveCallScreen
 import com.jarvis.nchat.presentation.calls.CallHistoryScreen
 import com.jarvis.nchat.presentation.calls.CallStatus
@@ -22,6 +26,7 @@ import com.jarvis.nchat.presentation.chats.ChatDetailScreen
 import com.jarvis.nchat.presentation.chats.ChatListScreen
 import com.jarvis.nchat.presentation.profile.ProfileScreen
 import com.jarvis.nchat.presentation.search.SearchScreen
+import com.jarvis.nchat.presentation.profile.UserProfileScreen
 
 @Composable
 fun ChatAppRoot(startDestination: String) {
@@ -53,13 +58,49 @@ fun ChatAppRoot(startDestination: String) {
             composable(Screen.Login.route) {
                 LoginScreen(
                     onLoginSuccess = { navController.navigate(Screen.Chats.route) { popUpTo(0) } },
-                    onNavigateToRegister = { navController.navigate(Screen.Register.route) }
+                    onNavigateToRegister = { navController.navigate(Screen.Register.route) },
+                    onNavigateToForgotPassword = { navController.navigate(Screen.ForgotPassword.route) }
                 )
             }
             composable(Screen.Register.route) {
                 RegisterScreen(
-                    onRegisterSuccess = { navController.navigate(Screen.Chats.route) { popUpTo(0) } },
+                    onOtpSent = { email -> navController.navigate(Screen.VerifyRegisterOtp.createRoute(email)) },
                     onNavigateToLogin = { navController.navigate(Screen.Login.route) }
+                )
+            }
+            composable(Screen.VerifyRegisterOtp.route) { backStackEntry ->
+                val email = backStackEntry.arguments?.getString("email") ?: ""
+                RegisterVerifyScreen(
+                    email = email,
+                    onVerified = { navController.navigate(Screen.Chats.route) { popUpTo(0) } },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.ForgotPassword.route) {
+                ForgotPasswordScreen(
+                    onOtpSent = { email -> navController.navigate(Screen.VerifyResetOtp.createRoute(email)) },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.VerifyResetOtp.route) { backStackEntry ->
+                val email = backStackEntry.arguments?.getString("email") ?: ""
+                ResetVerifyScreen(
+                    email = email,
+                    onVerified = { resetToken ->
+                        navController.navigate(Screen.ResetPassword.createRoute(resetToken))
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Screen.ResetPassword.route) { backStackEntry ->
+                val resetToken = backStackEntry.arguments?.getString("resetToken") ?: ""
+                ResetPasswordScreen(
+                    resetToken = resetToken,
+                    onDone = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
                 )
             }
             composable(Screen.Chats.route) {
@@ -72,24 +113,53 @@ fun ChatAppRoot(startDestination: String) {
             }
             composable(Screen.Search.route) {
                 SearchScreen(
-                    onStartChatClick = { conversationId ->
-                        navController.navigate(Screen.ChatDetail.createRoute(conversationId, "", "Chat", false))
+                    onStartChatClick = { conversationId, otherUserId, username ->
+                        navController.navigate(
+                            Screen.ChatDetail.createRoute(conversationId, otherUserId, username, false)
+                        )
+                    },
+                    onUserClick = { userId, username ->
+                        navController.navigate(Screen.UserProfile.createRoute(userId, username))
                     }
                 )
             }
             composable(Screen.Calls.route) {
                 CallHistoryScreen(
-                    onAudioCallClick = { otherUserId, username ->
-                        callViewModel.startCall(otherUserId, username, conversationId = "")
-                        navController.navigate(Screen.ActiveCall.createRoute(otherUserId))
+                    onAudioCallClick = { userId, username ->
+                        navController.navigate(
+                            Screen.ActiveCall.createRoute(userId)
+                        )
                     }
                 )
             }
+
             composable(Screen.Profile.route) {
                 ProfileScreen(
-                    onLoggedOut = { navController.navigate(Screen.Login.route) { popUpTo(0) } }
+                    onLoggedOut = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) {
+                                inclusive = true
+                            }
+                        }
+                    }
                 )
             }
+            composable(Screen.UserProfile.route) { backStackEntry ->
+                val username = backStackEntry.arguments?.getString("username") ?: "User"
+                val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                UserProfileScreen(
+                    username = username,
+                    avatarUrl = null,
+                    isOnline = false, // TODO: pass real online status through nav args like ChatDetail does
+                    onBackClick = { navController.popBackStack() },
+                    onMessageClick = {
+                        navController.navigate(Screen.ChatDetail.createRoute("", userId, username, false))
+                    },
+                    onAudioCallClick = { navController.navigate(Screen.ActiveCall.createRoute(userId)) },
+                    onVideoCallClick = { navController.navigate(Screen.ActiveCall.createRoute(userId)) }
+                )
+            }
+
             composable(Screen.ChatDetail.route) { backStackEntry ->
                 val conversationId = backStackEntry.arguments?.getString("conversationId") ?: ""
                 val username = backStackEntry.arguments?.getString("username") ?: "Chat"
