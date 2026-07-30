@@ -26,7 +26,9 @@ import org.webrtc.RtpReceiver
 import org.webrtc.SessionDescription
 import javax.inject.Inject
 import javax.inject.Singleton
-
+import com.jarvis.nchat.core.call.CallRingtonePlayer
+import com.jarvis.nchat.core.call.CallNotificationHelper
+import com.jarvis.nchat.core.call.PendingIncomingCall
 
 
 enum class CallStatus { IDLE, RINGING_OUTGOING, RINGING_INCOMING, CONNECTING, CONNECTED, RECONNECTING, ENDED }
@@ -60,6 +62,8 @@ class CallSessionRepository @Inject constructor(
     private val callAudioManager: CallAudioManager,
     private val tokenDataStore: TokenDataStore,
     private val pendingCallStore: PendingCallStore,
+    private val ringtonePlayer: CallRingtonePlayer,   // ← new
+    private val callNotificationHelper: CallNotificationHelper,
     @ApplicationContext private val appContext: Context,
 ) {
     private val _uiState = MutableStateFlow(CallUiState())
@@ -71,6 +75,7 @@ class CallSessionRepository @Inject constructor(
     private var reconnectGraceJob: kotlinx.coroutines.Job? = null
 
     private var myUserId: String? = null
+
 
     fun startListening() {
         if (listenersStarted) return
@@ -137,14 +142,30 @@ class CallSessionRepository @Inject constructor(
             status = CallStatus.RINGING_INCOMING,
             otherUserId = fromUserId, otherUsername = fromUsername, conversationId = conversationId, callId = callId,
         )
+
+        ringtonePlayer.start()
+        callNotificationHelper.showIncomingCall(
+            PendingIncomingCall(callId, fromUserId, fromUsername, conversationId, callType = "audio")
+        )
+
+        repoScope.launch {
+            kotlinx.coroutines.delay(45_000)
+            if (_uiState.value.status == CallStatus.RINGING_INCOMING) endCallLocally()
+        }
     }
 
     fun acceptCall() {
         val state = _uiState.value
         if (state.status != CallStatus.RINGING_INCOMING) return
+        ringtonePlayer.stop()
         callManager.createPeerConnection(peerObserver())
-        socketManager.emitCallAccept(state.otherUserId, state.conversationId, state.callId)
         _uiState.value = state.copy(status = CallStatus.CONNECTING)
+        socketManager.emitCallAccept(state.otherUserId, state.conversationId, state.callId) { ack ->
+            if (ack.has("error")) {
+                _uiState.value = _uiState.value.copy(status = CallStatus.ENDED, errorMessage = "Call ended")
+                cleanupAfterEnd()
+            }
+        }
     }
 
     fun rejectCall() {
@@ -167,12 +188,12 @@ class CallSessionRepository @Inject constructor(
     }
 
     private fun cleanupAfterEnd() {
+        ringtonePlayer.stop()   // ← new — safety net in case accept was never tapped
         callManager.endCall()
         callAudioManager.endCallAudio()
         durationTimerJob?.cancel()
         reconnectGraceJob?.cancel()
         stopCallForegroundService()
-        // Reset to IDLE shortly after, so the UI has a beat to show "call ended"
         repoScope.launch {
             kotlinx.coroutines.delay(1500)
             if (_uiState.value.status == CallStatus.ENDED) {

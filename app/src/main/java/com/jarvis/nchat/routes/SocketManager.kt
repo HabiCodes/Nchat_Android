@@ -123,11 +123,11 @@ class SocketManager @Inject constructor() {
         socket?.emit("call:invite", payload, io.socket.client.Ack { args -> onAck(args[0] as JSONObject) })
     }
 
-    fun emitCallAccept(toUserId: String, conversationId: String, callId: String?) {
+    fun emitCallAccept(toUserId: String, conversationId: String, callId: String?, onAck: (JSONObject) -> Unit = {}) {
         val payload = JSONObject().apply {
             put("toUserId", toUserId); put("conversationId", conversationId); put("callId", callId)
         }
-        socket?.emit("call:accept", payload)
+        socket?.emit("call:accept", payload, io.socket.client.Ack { args -> onAck(args[0] as JSONObject) })
     }
 
     fun emitCallReject(toUserId: String, conversationId: String, callId: String?, reason: String = "declined") {

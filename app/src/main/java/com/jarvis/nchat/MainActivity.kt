@@ -20,6 +20,11 @@ import com.jarvis.nchat.data.repository.AuthRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import  kotlinx.coroutines.launch
+import android.app.NotificationManager
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import android.os.PowerManager
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -35,6 +40,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestNotificationPermissionIfNeeded()
+        ensureFullScreenIntentPermission()
         setContent {
             var startDestination by remember { mutableStateOf<String?>(null) }
 
@@ -79,6 +85,27 @@ class MainActivity : ComponentActivity() {
 
         if (!alreadyGranted) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+    private fun ensureFullScreenIntentPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val nm = getSystemService(NotificationManager::class.java)
+        if (!nm.canUseFullScreenIntent()) {
+            startActivity(
+                Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+            )
+        }
+    }
+    private fun requestIgnoreBatteryOptimizations() {
+        val pm = getSystemService(PowerManager::class.java)
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            startActivity(
+                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+            )
         }
     }
 }

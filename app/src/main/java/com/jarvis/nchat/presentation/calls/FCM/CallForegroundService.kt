@@ -32,6 +32,7 @@ class CallForegroundService : Service() {
 
     @Inject lateinit var socketManager: SocketManager
     @Inject lateinit var tokenDataStore: TokenDataStore
+    @Inject lateinit var ringtonePlayer: CallRingtonePlayer
 
     private val scope = CoroutineScope(Dispatchers.IO + Job())
 
@@ -42,6 +43,7 @@ class CallForegroundService : Service() {
             ?: DEFAULT_NOTIFICATION_ID
 
         startForeground(notificationId, buildMinimalNotification())
+        ringtonePlayer.start()
 
         scope.launch {
             val token = tokenDataStore.token.first()
@@ -54,8 +56,10 @@ class CallForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        ringtonePlayer.stop()
         scope.cancel()
         super.onDestroy()
+
     }
 
     /**

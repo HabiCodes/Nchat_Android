@@ -3,56 +3,48 @@ package com.jarvis.nchat.core.fcm
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import com.jarvis.nchat.MainActivity
 import com.jarvis.nchat.R
-import com.jarvis.nchat.core.call.CallForegroundService
-import com.jarvis.nchat.core.call.PendingCallStore
-import com.jarvis.nchat.core.call.PendingIncomingCall
-import com.jarvis.nchat.core.datastore.TokenDataStore
+import com.jarvis.nchat.core.chat.ActiveConversationTracker
+import com.jarvis.nchat.core.chat.AppForegroundTracker
 import com.jarvis.nchat.data.repository.AuthRepository
-import com.jarvis.nchat.presentation.calls.IncomingCallActivity
+import com.jarvis.nchat.presentation.calls.CallSessionRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-private const val CALL_CHANNEL_ID = "nchat_incoming_calls"
-private const val CALL_NOTIFICATION_ID = 9001
+private const val MESSAGE_CHANNEL_ID = "nchat_messages"
 
 /**
  * IMPORTANT: this must be a **data message** from your backend (only a
- * `"data"` field, no `"notification"` field in the FCM payload). A payload
- * that includes `"notification"` gets delivered straight to the system tray
- * by the OS when the app is backgrounded/killed, and `onMessageReceived`
- * is never called — which is almost certainly why calls "don't work
- * properly" today if your backend is sending notification-type pushes.
+ * `"data"` field, no `"notification"` field in the FCM payload) — otherwise
+ * the OS delivers it straight to the system tray and onMessageReceived
+ * never runs.
  */
 @AndroidEntryPoint
 class NChatFirebaseMessagingService : FirebaseMessagingService() {
 
-    @Inject lateinit var pendingCallStore: PendingCallStore
     @Inject lateinit var authRepository: AuthRepository
-    @Inject lateinit var tokenDataStore: TokenDataStore
+    @Inject lateinit var callSessionRepository: CallSessionRepository
+    @Inject lateinit var activeConversationTracker: ActiveConversationTracker
+    @Inject lateinit var appForegroundTracker: AppForegroundTracker
 
     override fun onMessageReceived(message: RemoteMessage) {
         val data = message.data
         when (data["type"]) {
             "incoming_call" -> handleIncomingCall(data)
-            // add other push types here later (e.g. "new_message") without
-            // touching the call-handling path.
+            "new_message" -> handleNewMessage(data)
         }
     }
 
     override fun onNewToken(token: String) {
-        // Fire-and-forget register with backend whenever the token rotates
-        // (fresh install, app data cleared, or periodic OS-driven rotation).
         CoroutineScope(Dispatchers.IO).launch {
             runCatching { authRepository.registerFcmToken(token) }
         }
@@ -63,66 +55,60 @@ class NChatFirebaseMessagingService : FirebaseMessagingService() {
         val callId = data["callId"]
         val fromUsername = data["fromUsername"] ?: "Unknown"
         val conversationId = data["conversationId"] ?: return
-        val callType = data["callType"] ?: "audio"
 
-        pendingCallStore.pending = PendingIncomingCall(
-            callId = callId,
-            fromUserId = fromUserId,
-            fromUsername = fromUsername,
-            conversationId = conversationId,
-            callType = callType,
-        )
+        // Single source of truth — starts the ringtone, shows the
+        // notification, arms the timeout. Safe to call even if a socket
+        // 'call:incoming' already triggered the same thing (idempotent).
+        callSessionRepository.onIncomingCall(fromUserId, fromUsername, conversationId, callId)
+    }
 
-        ensureNotificationChannel()
+    private fun handleNewMessage(data: Map<String, String>) {
+        val conversationId = data["conversationId"] ?: return
 
-        val fullScreenIntent = Intent(this, IncomingCallActivity::class.java).apply {
+        // Already visible on screen, or the app is foregrounded (the socket
+        // path / MessageNotificationManager already handles that case) —
+        // don't double-notify.
+        if (activeConversationTracker.activeConversationId == conversationId) return
+        if (appForegroundTracker.isForeground) return
+
+        val fromUsername = data["fromUsername"] ?: "New message"
+        val preview = data["preview"] ?: "Sent a message"
+
+        ensureMessageChannel()
+
+        val openIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(IncomingCallActivity.EXTRA_FROM_USER_ID, fromUserId)
-            putExtra(IncomingCallActivity.EXTRA_FROM_USERNAME, fromUsername)
-            putExtra(IncomingCallActivity.EXTRA_CONVERSATION_ID, conversationId)
-            putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId)
+            putExtra("conversationId", conversationId)
         }
-        val fullScreenPendingIntent = PendingIntent.getActivity(
-            this, CALL_NOTIFICATION_ID, fullScreenIntent,
+        val pendingIntent = PendingIntent.getActivity(
+            this, conversationId.hashCode(), openIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val notification = NotificationCompat.Builder(this, CALL_CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, MESSAGE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Incoming call")
-            .setContentText(fromUsername)
+            .setContentTitle(fromUsername)
+            .setContentText(preview)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setOngoing(true)
-            .setAutoCancel(false)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setGroup(conversationId)
             .build()
 
-        // Foreground service keeps the process alive long enough to reconnect
-        // the socket and hold the call state while the full-screen UI shows.
-        val serviceIntent = Intent(this, CallForegroundService::class.java).apply {
-            putExtra(CallForegroundService.EXTRA_NOTIFICATION_ID, CALL_NOTIFICATION_ID)
-        }
-        ContextCompat.startForegroundService(this, serviceIntent)
-
-        val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.notify(CALL_NOTIFICATION_ID, notification)
+        getSystemService(NotificationManager::class.java)
+            .notify(conversationId.hashCode(), notification)
     }
 
-    private fun ensureNotificationChannel() {
+    private fun ensureMessageChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java)
-        if (manager.getNotificationChannel(CALL_CHANNEL_ID) != null) return
-
-        val channel = NotificationChannel(
-            CALL_CHANNEL_ID,
-            "Incoming calls",
-            NotificationManager.IMPORTANCE_HIGH,
-        ).apply {
-            description = "Notifications for incoming NChat calls"
-            enableVibration(true)
-            setBypassDnd(true)
-        }
-        manager.createNotificationChannel(channel)
+        if (manager.getNotificationChannel(MESSAGE_CHANNEL_ID) != null) return
+        manager.createNotificationChannel(
+            NotificationChannel(MESSAGE_CHANNEL_ID, "Messages", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "New message notifications"
+                enableVibration(true)
+            }
+        )
     }
 }

@@ -46,6 +46,10 @@ fun IncomingCallScreen(
         label = "pulseScale"
     )
 
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val micPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { granted -> if (granted) viewModel.acceptCall() }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -79,7 +83,16 @@ fun IncomingCallScreen(
             CallActionButton(
                 icon = Icons.Filled.Call,
                 backgroundColor = com.jarvis.nchat.core.designsystem.OutgoingCallGreen,
-                onClick = { viewModel.acceptCall() }
+                onClick = {
+                    if (androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.RECORD_AUDIO
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        viewModel.acceptCall()
+                    } else {
+                        micPermissionLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                    }
+                }
             )
         }
     }

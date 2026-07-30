@@ -3,6 +3,7 @@ package com.jarvis.nchat.presentation.chats
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.jarvis.nchat.core.chat.ActiveConversationTracker
 import com.jarvis.nchat.core.network.SocketManager
 import com.jarvis.nchat.data.repository.ChatRepository
 import com.jarvis.nchat.domain.model.Message
@@ -26,6 +27,7 @@ data class ChatDetailUiState(
 class ChatDetailViewModel @Inject constructor(
     private val chatRepository: ChatRepository,
     private val socketManager: SocketManager,
+    private val activeConversationTracker: ActiveConversationTracker,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -37,11 +39,19 @@ class ChatDetailViewModel @Inject constructor(
     private var typingStopJob: Job? = null
 
     init {
+        activeConversationTracker.activeConversationId = conversationId
         loadHistory()
         observeLiveMessages()
         observeReadReceipts()
         observeTypingIndicator()
         chatRepository.markConversationRead(conversationId)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        if (activeConversationTracker.activeConversationId == conversationId) {
+            activeConversationTracker.activeConversationId = null
+        }
     }
 
     private fun loadHistory() {
