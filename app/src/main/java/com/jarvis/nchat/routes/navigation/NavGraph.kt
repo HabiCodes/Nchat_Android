@@ -27,7 +27,9 @@ import com.jarvis.nchat.presentation.chats.ChatListScreen
 import com.jarvis.nchat.presentation.profile.ProfileScreen
 import com.jarvis.nchat.presentation.search.SearchScreen
 import com.jarvis.nchat.presentation.profile.UserProfileScreen
-
+import com.jarvis.nchat.presentation.bottomnav.AnimatedBottomNavBar
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import com.jarvis.nchat.routes.navigation.bottomNavItems
 @Composable
 fun ChatAppRoot(startDestination: String) {
     val navController = rememberNavController()
@@ -46,8 +48,29 @@ fun ChatAppRoot(startDestination: String) {
     Scaffold(
         bottomBar = {
             val currentRoute = backStackEntry?.destination?.route
-            val tabRoutes = setOf(Screen.Chats.route, Screen.Search.route, Screen.Calls.route, Screen.Profile.route)
-            if (currentRoute in tabRoutes) ChatAppBottomNavBar(navController)
+
+            val tabRoutes = setOf(
+                Screen.Chats.route,
+                Screen.Search.route,
+                Screen.Calls.route,
+                Screen.Profile.route
+            )
+
+            if (currentRoute in tabRoutes) {
+                AnimatedBottomNavBar(
+                    items = bottomNavItems,
+                    currentRoute = currentRoute,
+                    onItemSelected = { route ->
+                        navController.navigate(route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
         }
     ) { padding ->
         NavHost(
